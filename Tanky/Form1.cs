@@ -12,7 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace Tanky
+namespace Tanky____
 {
     public partial class Form1 : Form
     {
@@ -31,7 +31,7 @@ namespace Tanky
 
         public Form1()
         {
-            InitializeComponent();
+            //InitializeComponent();
 
             DoubleBuffered = true;
 
@@ -261,9 +261,24 @@ namespace Tanky
             _shotDir = new Vector2(dirX, dirY);
             _shotPos = Pos;
             _gravity = gravity;
+
+            new Thread(() =>
+            {
+                while (true)
+                {
+                    Move();
+                    Thread.Sleep(15);
+                }
+            })
+            { IsBackground = true }.Start();
         }
 
         public override void Update()
+        {
+            
+        }
+
+        private void Move()
         {
             _time += _timeStep;
 

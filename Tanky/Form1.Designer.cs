@@ -1,4 +1,4 @@
-﻿namespace Tanky
+﻿namespace Tanky____
 {
     partial class Form1
     {
