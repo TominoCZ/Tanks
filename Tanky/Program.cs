@@ -3,7 +3,10 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -30,7 +33,7 @@ namespace Tanky
         private List<Entity> _entities = new List<Entity>();
         private Tank t1;
         private Tank t2;
-        private float _floor = 500;
+        public static float Floor = 400;
 
         private List<Key> _keysDown = new List<Key>();
 
@@ -40,11 +43,17 @@ namespace Tanky
         private bool _t2GoingLeft = true;
         private bool _t2Checked = false;
 
-        public Game():base(640, 480, new OpenTK.Graphics.GraphicsMode(32, 1, 0, 8), "Tanks")
-        {
-            t1 = new Tank(100, _floor);
+        public static Game Instance;
 
-            t2 = new Tank(ClientSize.Width - 100, _floor);
+        public Game() : base(640, 480, new OpenTK.Graphics.GraphicsMode(32, 0, 0, 8))
+        {
+            Instance = this;
+
+            t1 = new Tank(100, Floor);
+
+            t2 = new Tank(ClientSize.Width - 100, Floor);
+
+            Title = "Tanks [OpenGL]";
         }
 
         protected override void OnLoad(EventArgs e)
@@ -72,28 +81,39 @@ namespace Tanky
 
             GameLoop();
 
-            for (var index = 0; index < _entities.Count; index++)
+            for (var index = _entities.Count - 1; index >= 0; index--)
             {
                 var entity = _entities[index];
+
                 entity.Render();
+
+                if (entity.IsDead)
+                {
+                    _entities.Remove(entity);
+                }
             }
 
             GL.Color3(0, 0, 0);
-            GLHelper.DrawLine(0, _floor, ClientSize.Width, _floor, 1);
+            GLHelper.DrawLine(0, Floor, ClientSize.Width, Floor, 1);
 
             GL.Color3(0, 0, 0);
-            DrawBallisticCurve(t1);
-            DrawBallisticCurve(t2);
 
-            t1.Render();
-            t2.Render();
+            if (!t1.IsDead)
+                DrawBallisticCurve(t1);
+            if (!t2.IsDead)
+                DrawBallisticCurve(t2);
+
+            if (!t1.IsDead)
+                t1.Render();
+            if (!t2.IsDead)
+                t2.Render();
 
             SwapBuffers();
         }
 
         protected override void OnKeyDown(KeyboardKeyEventArgs e)
         {
-            if (e.Key == Key.Space && !_keysDown.Contains(Key.Space))
+            if (e.Key == Key.Space && !_keysDown.Contains(Key.Space) && !t1.IsDead)
             {
                 var dir = t1.AimDir;
                 var pos = t1.BarrelTipPos;
@@ -103,12 +123,12 @@ namespace Tanky
 
                 var dist = 1;//250 / (mouseVec - t1.Pos).Length();
 
-                var p = new Projectile(pos.X, pos.Y, dir.X, dir.Y, dist * 0.00075f);
+                var p = new Projectile(pos.X, pos.Y, dir.X, dir.Y, dist * 0.00075f, t1);
 
                 _entities.Add(p);
             }
 
-            if (e.Key == (Key)4 && !_keysDown.Contains((Key)4))
+            if (e.Key == (Key)4 && !_keysDown.Contains((Key)4) && !t2.IsDead)
             {
                 var dir = t2.AimDir;
                 var pos = t2.BarrelTipPos;
@@ -118,7 +138,7 @@ namespace Tanky
 
                 var dist = 1;//250 / (mouseVec - t1.Pos).Length();
 
-                var p = new Projectile(pos.X, pos.Y, dir.X, dir.Y, dist * 0.00075f);
+                var p = new Projectile(pos.X, pos.Y, dir.X, dir.Y, dist * 0.00075f, t2);
 
                 _entities.Add(p);
             }
@@ -139,66 +159,78 @@ namespace Tanky
 
         private void GameLoop()
         {
-            if (_keysDown.Contains(Key.W))
+            if (!t1.IsDead)
             {
-                if (!_t1Checked)
+                if (_keysDown.Contains(Key.W))
                 {
-                    _t1GoingLeft = t1.AimAngle <= 90;
+                    if (!_t1Checked)
+                    {
+                        _t1GoingLeft = t1.AimAngle <= 90;
 
-                    _t1Checked = true;
+                        _t1Checked = true;
+                    }
+
+                    t1.AimAngle += _t1GoingLeft ? 1 : -1;
                 }
 
-                t1.AimAngle += _t1GoingLeft ? 1 : -1;
-            }
-            if (_keysDown.Contains(Key.S))
-            {
-                if (!_t1Checked)
+                if (_keysDown.Contains(Key.S))
                 {
-                    _t1GoingLeft = t1.AimAngle <= 90;
+                    if (!_t1Checked)
+                    {
+                        _t1GoingLeft = t1.AimAngle <= 90;
 
-                    _t1Checked = true;
+                        _t1Checked = true;
+                    }
+
+                    t1.AimAngle -= _t1GoingLeft ? 1 : -1;
                 }
 
-                t1.AimAngle -= _t1GoingLeft ? 1 : -1;
-            }
-            if (_keysDown.Contains(Key.A))
-            {
-                t1.Motion.X = Math.Max(t1.Motion.X - 0.75f, -15);
-            }
-            if (_keysDown.Contains(Key.D))
-            {
-                t1.Motion.X = Math.Min(t1.Motion.X + 0.75f, 15);
-            }
-
-            if (_keysDown.Contains(Key.Up))
-            {
-                if (!_t2Checked)
+                if (_keysDown.Contains(Key.A))
                 {
-                    _t2GoingLeft = t2.AimAngle <= 90;
-
-                    _t2Checked = true;
+                    t1.Motion.X = Math.Max(t1.Motion.X - 0.75f, -15);
                 }
 
-                t2.AimAngle += _t2GoingLeft ? 1 : -1;
-            }
-            if (_keysDown.Contains(Key.Down))
-            {
-                if (!_t2Checked)
+                if (_keysDown.Contains(Key.D))
                 {
-                    _t2GoingLeft = t2.AimAngle <= 90;
+                    t1.Motion.X = Math.Min(t1.Motion.X + 0.75f, 15);
+                }
+            }
 
-                    _t2Checked = true;
+            if (!t2.IsDead)
+            {
+                if (_keysDown.Contains(Key.Up))
+                {
+                    if (!_t2Checked)
+                    {
+                        _t2GoingLeft = t2.AimAngle <= 90;
+
+                        _t2Checked = true;
+                    }
+
+                    t2.AimAngle += _t2GoingLeft ? 1 : -1;
                 }
 
-                t2.AimAngle -= _t2GoingLeft ? 1 : -1;
-            }
-            if (_keysDown.Contains(Key.Left))
-            {
-                t2.Motion.X = Math.Max(t2.Motion.X - 0.75f, -15);
-            }
-            if (_keysDown.Contains(Key.Right))
-            {
-                t2.Motion.X = Math.Min(t2.Motion.X + 0.75f, 15);
+                if (_keysDown.Contains(Key.Down))
+                {
+                    if (!_t2Checked)
+                    {
+                        _t2GoingLeft = t2.AimAngle <= 90;
+
+                        _t2Checked = true;
+                    }
+
+                    t2.AimAngle -= _t2GoingLeft ? 1 : -1;
+                }
+
+                if (_keysDown.Contains(Key.Left))
+                {
+                    t2.Motion.X = Math.Max(t2.Motion.X - 0.75f, -15);
+                }
+
+                if (_keysDown.Contains(Key.Right))
+                {
+                    t2.Motion.X = Math.Min(t2.Motion.X + 0.75f, 15);
+                }
             }
 
             for (var index = 0; index < _entities.Count; index++)
@@ -207,8 +239,10 @@ namespace Tanky
                 entity.Update();
             }
 
-            t1.Update();
-            t2.Update();
+            if (!t1.IsDead)
+                t1.Update();
+            if (!t2.IsDead)
+                t2.Update();
 
             //var s = Mouse.GetState();
 
@@ -230,14 +264,14 @@ namespace Tanky
             {
                 var vec = MathUtil.BallisticCurve(tank.BarrelTipPos, tank.AimDir, 0.00075f * dist, t);
 
-                if (vec.Y >= _floor && curve.Count > 0)
+                if (vec.Y >= Floor && curve.Count > 0)
                 {
                     var pf = curve.Last();
 
                     var last = new Vector2(curve[curve.Count - 2], curve[curve.Count - 1]);
                     var dir = Vector2.Normalize(last - vec);
 
-                    last += dir * (last.Y - _floor);
+                    last += dir * (last.Y - Floor);
 
                     vec.X = last.X;
                     vec.Y = last.Y;
@@ -252,8 +286,53 @@ namespace Tanky
 
                 t += 5;
             }
-            
+
             GLHelper.DrawLines(1, curve.ToArray());
+        }
+
+        public void AddParticle(Particle p)
+        {
+            _entities.Add(p);
+        }
+
+        public Tank GetColliding(Projectile p)
+        {
+            if (t1.CollidesWith(p))
+                return t1;
+            if (t2.CollidesWith(p))
+                return t2;
+
+            return null;
+        }
+    }
+
+    class Particle : Entity
+    {
+        private int _age;
+        private int _maxAge = 100;
+
+        public Particle(float x, float y, float mx, float my) : base(x, y)
+        {
+            Motion = new Vector2(mx, my);
+        }
+
+        public override void Update()
+        {
+            base.Update();
+
+            if ((_age += 5) >= _maxAge)
+                IsDead = true;
+        }
+
+        public override void Render()
+        {
+            GL.Color3(1f, 0.5f, 0);
+            
+            var size = (1 - Math.Min((float)_age / _maxAge, 1)) * 15;
+
+            GL.Translate(Pos.X, Pos.Y, 0);
+            GLHelper.FillRectangle(-size / 2, -size / 2, size, size);
+            GL.Translate(-Pos.X, -Pos.Y, 0);
         }
     }
 
@@ -268,11 +347,19 @@ namespace Tanky
 
         private Vector2 _shotPos;
 
-        public Projectile(float x, float y, float dirX, float dirY, float gravity) : base(x, y)
+        public float Radius = 5;
+
+        public float MaxAge = 120;
+
+        private Tank _shooter;
+
+        public Projectile(float x, float y, float dirX, float dirY, float gravity, Tank shooter) : base(x, y)
         {
             _shotDir = new Vector2(dirX, dirY);
             _shotPos = Pos;
             _gravity = gravity;
+
+            _shooter = shooter;
 
             new Thread(() =>
             {
@@ -287,7 +374,22 @@ namespace Tanky
 
         public override void Update()
         {
+            if (Game.Instance.GetColliding(this) is Tank hit && hit != _shooter)
+            {
+                if (CanCollide)
+                    hit.Health -= 25;
 
+                CanCollide = false;
+                IsDead = true;
+            }
+
+            if (!CanCollide)
+            {
+                if (MaxAge <= 0)
+                    IsDead = true;
+
+                MaxAge--;
+            }
         }
 
         private void Move()
@@ -296,9 +398,9 @@ namespace Tanky
 
             Pos = MathUtil.BallisticCurve(_shotPos, _shotDir, _gravity, _time);
 
-            if (Pos.Y >= 500)
+            if (Pos.Y >= Game.Floor - Radius)
             {
-                Pos.Y = 500;
+                Pos.Y = Game.Floor - Radius;
 
                 _timeStep *= 0.925f;
 
@@ -308,7 +410,8 @@ namespace Tanky
 
         public override void Render()
         {
-            GLHelper.FillEllipse(Pos.X - 5, Pos.Y - 5, 10, 10);
+            GL.Color3(0, 0, 0);
+            GLHelper.FillEllipse(Pos.X - Radius, Pos.Y - Radius, Radius * 2, Radius * 2);
         }
     }
 
@@ -318,6 +421,21 @@ namespace Tanky
         public Vector2 Motion;
 
         public bool CanCollide = true;
+
+        public bool IsDead
+        {
+            get => _isDead;
+
+            set
+            {
+                if (value && value != _isDead)
+                    OnDeath();
+
+                _isDead = value;
+            }
+        }
+
+        private bool _isDead;
 
         protected Entity(float x, float y)
         {
@@ -335,10 +453,16 @@ namespace Tanky
         {
 
         }
+
+        protected virtual void OnDeath()
+        {
+
+        }
     }
 
     class Tank : Entity
     {
+        private int _health = 100;
         private float _aimAngle;
 
         public float AimAngle
@@ -352,8 +476,6 @@ namespace Tanky
                 _aimAngle = Math.Max(Math.Min(value, 180), 0);
                 var rad = Math.PI / 180 * _aimAngle;
 
-                Console.WriteLine(_aimAngle);
-
                 var x = (float)Math.Cos(rad);
                 var y = (float)Math.Sin(rad);
 
@@ -365,6 +487,13 @@ namespace Tanky
 
         public float BarrelLength = 20;
 
+        public int Health
+        {
+            get => _health;
+
+            set => _health = MathHelper.Clamp(value, 0, 100);
+        }
+
         public Tank(float x, float y) : base(x, y)
         {
             AimAngle = 45;
@@ -373,6 +502,8 @@ namespace Tanky
         public override void Update()
         {
             base.Update();
+
+            IsDead = Health == 0;
 
             var center = new Vector2(Pos.X, Pos.Y - 38);
 
@@ -393,6 +524,38 @@ namespace Tanky
 
             GL.Color3(0, 0, 0);
             GLHelper.FillRectangle(pos.X - 50, pos.Y, 100, 38);
+
+            GL.Color3(1 - Health / 100f, 0.5f + Health / 100f * 0.5f, 0);
+            GLHelper.FillRectangle(pos.X - 50, pos.Y - 5 + 38, 100 * Health / 100f, 5);
+        }
+
+        protected override void OnDeath()
+        {
+            for (int i = 0; i < 16; i++)
+            {
+                var a = i / 16f * MathHelper.TwoPi;
+
+                var x = (float)Math.Cos(a) * 10;
+                var y = (float)Math.Sin(a) * 10;
+
+                var p = new Particle(Pos.X, Pos.Y, x, y);
+                
+                Game.Instance.AddParticle(p);
+            }
+        }
+
+        public bool CollidesWith(Projectile p)
+        {
+            if (IsDead)
+                return false;
+
+            var bb1 = new RectangleF(Pos.X - 50, Pos.Y - 38, 100, 38);
+            var bb2 = new RectangleF(Pos.X - 20, Pos.Y - 20 - 38, 40, 40);
+
+            bb1.Inflate(p.Radius, p.Radius);
+            bb2.Inflate(p.Radius, p.Radius);
+
+            return bb1.Contains(p.Pos.X, p.Pos.Y) || bb2.Contains(p.Pos.X, p.Pos.Y);
         }
     }
 
