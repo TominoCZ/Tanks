@@ -38,30 +38,59 @@ namespace Tanky
         private List<Key> _keysDown = new List<Key>();
 
         private bool _t1GoingLeft = true;
-        private bool _t1Checked = false;
+        private bool _t1Checked;
 
         private bool _t2GoingLeft = true;
-        private bool _t2Checked = false;
+        private bool _t2Checked;
 
         public static Game Instance;
 
-        public Game() : base(640, 480, new OpenTK.Graphics.GraphicsMode(32, 0, 0, 8))
+        private Button _restartButton;
+
+        public Game() : base(800, 600, new OpenTK.Graphics.GraphicsMode(32, 0, 0, 8))
         {
             Instance = this;
 
+            StartGame();
+
+            Title = "Tanks [OpenGL]";
+        }
+
+        private void StartGame()
+        {
             t1 = new Tank(100, Floor);
 
             t2 = new Tank(ClientSize.Width - 100, Floor);
 
-            Title = "Tanks [OpenGL]";
+            t2.AimAngle += 90;
+
+            _t1GoingLeft = true;
+            _t1Checked = false;
+
+            _t2GoingLeft = true;
+            _t2Checked = false;
+
+            for (var i = 0; i < _entities.Count; i++)
+            {
+                _entities[i].IsDead = true;
+            }
+
+            _entities.Clear();
+
+            _keysDown.Clear();
         }
 
         protected override void OnLoad(EventArgs e)
         {
             GL.Enable(EnableCap.Blend);
             GL.Enable(EnableCap.Multisample);
+            GL.Enable(EnableCap.Texture2D);
+
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
             GL.Hint(HintTarget.LineSmoothHint, HintMode.Nicest);
+
+            _restartButton = new Button(ClientSize.Width / 2 - 32, 0, 64, 64, "restart");
         }
 
         protected override void OnResize(EventArgs e)
@@ -72,6 +101,10 @@ namespace Tanky
             GL.LoadMatrix(ref mat);
 
             GL.Viewport(ClientRectangle);
+
+            _restartButton.PosX = ClientSize.Width / 2 - _restartButton.Width / 2;
+
+            OnRenderFrame(null);
         }
 
         protected override void OnRenderFrame(FrameEventArgs e)
@@ -107,6 +140,8 @@ namespace Tanky
                 t1.Render();
             if (!t2.IsDead)
                 t2.Render();
+
+            _restartButton.Render();
 
             SwapBuffers();
         }
@@ -155,6 +190,19 @@ namespace Tanky
                 _t2Checked = false;
 
             _keysDown.Remove(e.Key);
+        }
+
+        protected override void OnMouseMove(MouseMoveEventArgs e)
+        {
+            _restartButton.MouseHover(e.X, e.Y);
+        }
+
+        protected override void OnMouseDown(MouseButtonEventArgs e)
+        {
+            if (_restartButton.IsMouseOver)
+            {
+                StartGame();
+            }
         }
 
         private void GameLoop()
@@ -306,6 +354,50 @@ namespace Tanky
         }
     }
 
+    class Button
+    {
+        public int PosX;
+        public int PosY;
+
+        public int Width;
+        public int Height;
+
+        public string Icon;
+
+        public bool IsMouseOver { get; private set; }
+
+        public Button(int posX, int posY, int width, int height, string icon)
+        {
+            PosX = posX;
+            PosY = posY;
+
+            Width = width;
+            Height = height;
+
+            Icon = icon;
+        }
+
+        public void Render()
+        {
+            var id = TextureManager.GetOrRegister(Icon);
+
+            GL.Color4(1f, 0, 0, IsMouseOver ? 0.45f : 0.25f);
+            GLHelper.FillRectangle(PosX, PosY, Width, Height);
+            GL.Color4(1f, 1, 1, 1);
+
+            GL.BindTexture(TextureTarget.Texture2D, id);
+            GLHelper.FillRectangle(PosX, PosY, Width, Height);
+            GL.BindTexture(TextureTarget.Texture2D, 0);
+        }
+
+        public void MouseHover(int x, int y)
+        {
+            IsMouseOver =
+                x > PosX && x < PosX + Width &&
+                y > PosY && y < PosY + Height;
+        }
+    }
+
     class Particle : Entity
     {
         private int _age;
@@ -327,7 +419,7 @@ namespace Tanky
         public override void Render()
         {
             GL.Color3(1f, 0.5f, 0);
-            
+
             var size = (1 - Math.Min((float)_age / _maxAge, 1)) * 15;
 
             GL.Translate(Pos.X, Pos.Y, 0);
@@ -363,7 +455,7 @@ namespace Tanky
 
             new Thread(() =>
             {
-                while (true)
+                while (!IsDead)
                 {
                     Move();
                     Thread.Sleep(8);
@@ -539,7 +631,7 @@ namespace Tanky
                 var y = (float)Math.Sin(a) * 10;
 
                 var p = new Particle(Pos.X, Pos.Y, x, y);
-                
+
                 Game.Instance.AddParticle(p);
             }
         }
@@ -620,9 +712,13 @@ namespace Tanky
         public static void FillRectangle(float x, float y, float w, float h)
         {
             GL.Begin(PrimitiveType.Quads);
+            GL.TexCoord2(0, 0);
             GL.Vertex2(x, y);
+            GL.TexCoord2(0, 1);
             GL.Vertex2(x, y + h);
+            GL.TexCoord2(1, 1);
             GL.Vertex2(x + w, y + h);
+            GL.TexCoord2(1, 0);
             GL.Vertex2(x + w, y);
             GL.End();
         }
